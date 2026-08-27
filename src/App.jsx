@@ -3,43 +3,72 @@ import IdeaForm from "./components/IdeaForm";
 import IdeaCard from "./components/IdeaCard";
 import EmptyState from "./components/EmptyState";
 import "./App.css";
+import { supabase } from "./supabaseClient";
 
 function App() {
-  const [ideas, setIdeas] = useState(() => {
-    const savedIdeas = localStorage.getItem("appIdeas");
-
-    return savedIdeas ? JSON.parse(savedIdeas) : [];
-  });
-
+  const [ideas, setIdeas] = useState([]);
   const [editingIdea, setEditingIdea] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Save ideas whenever ideas change
   useEffect(() => {
-    localStorage.setItem("appIdeas", JSON.stringify(ideas));
-  }, [ideas]);
+  const loadIdeas = async () => {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-  // Add new idea
-  const addIdea = (name, description) => {
-    const newIdea = {
-      id: Date.now(),
-      name,
-      description,
-      createdAt: new Date().toLocaleDateString(),
-    };
+    if (error) {
+      console.error("Error loading ideas:", error);
+      return;
+    }
 
-    setIdeas((previousIdeas) => [
-      newIdea,
-      ...previousIdeas,
-    ]);
+    setIdeas(data);
   };
+
+  loadIdeas();
+}, []);
+
+  // Add new idea with add data base
+ const addIdea = async (name, description) => {
+  const { data, error } = await supabase
+    .from("projects")
+    .insert([
+      {
+        name,
+        description,
+        status: "draft",
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error adding idea:", error);
+    return;
+  }
+
+  setIdeas((previousIdeas) => [
+    data,
+    ...previousIdeas,
+  ]);
+};
 
   // Delete idea
-  const deleteIdea = (id) => {
-    setIdeas((previousIdeas) =>
-      previousIdeas.filter((idea) => idea.id !== id)
-    );
-  };
+const deleteIdea = async (id) => {
+  const { error } = await supabase
+    .from("projects")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error deleting idea:", error);
+    return;
+  }
+
+  setIdeas((previousIdeas) =>
+    previousIdeas.filter((idea) => idea.id !== id)
+  );
+};
 
   // Start editing
   const startEdit = (idea) => {
@@ -47,21 +76,54 @@ function App() {
   };
 
   // Update idea
-  const updateIdea = (name, description) => {
-    setIdeas((previousIdeas) =>
-      previousIdeas.map((idea) =>
-        idea.id === editingIdea.id
-          ? {
-              ...idea,
-              name,
-              description,
-            }
-          : idea
-      )
-    );
+const updateIdea = async (name, description) => {
+  const { data, error } = await supabase
+    .from("projects")
+    .update({
+      name,
+      description,
+    })
+    .eq("id", editingIdea.id)
+    .select()
+    .single();
 
-    setEditingIdea(null);
-  };
+  if (error) {
+    console.error("Error updating idea:", error);
+    return;
+  }
+
+  setIdeas((previousIdeas) =>
+    previousIdeas.map((idea) =>
+      idea.id === editingIdea.id ? data : idea
+    )
+  );
+
+  setEditingIdea(null);
+};
+
+
+  //status update
+  const approveIdea = async (id) => {
+  const { data, error } = await supabase
+    .from("projects")
+    .update({
+      status: "approved",
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error approving idea:", error);
+    return;
+  }
+
+  setIdeas((previousIdeas) =>
+    previousIdeas.map((idea) =>
+      idea.id === id ? data : idea
+    )
+  );
+};
 
   // Cancel editing
   const cancelEdit = () => {
@@ -190,10 +252,11 @@ function App() {
               {filteredIdeas.map((idea) => (
 
                 <IdeaCard
-                  key={idea.id}
-                  idea={idea}
-                  onEdit={startEdit}
-                  onDelete={deleteIdea}
+                key={idea.id}
+                idea={idea}
+                onEdit={startEdit}
+                onDelete={deleteIdea}
+                onApprove={approveIdea}
                 />
 
               ))}

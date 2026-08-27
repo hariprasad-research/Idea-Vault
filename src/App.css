@@ -677,3 +677,17 @@ button {
   background: #dc2626;
   transform: translateY(-1px);
 }
+.idea-status {
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.idea-status.draft {
+  font-weight: 600;
+}
+
+.idea-status.approved {
+  font-weight: 600;
+}
